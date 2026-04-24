@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BFHL — Node Hierarchy Explorer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #18181f;
+      --border: #2a2a35;
+      --accent: #7c6bff;
+      --accent2: #ff6b9d;
+      --accent3: #6bffcb;
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --error: #ff4f6b;
+      --success: #6bffcb;
+      --mono: 'Space Mono', monospace;
+      --display: 'Syne', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--display);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(124,107,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,107,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .glow-orb {
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-orb-1 { background: var(--accent); top: -200px; left: -200px; }
+    .glow-orb-2 { background: var(--accent2); bottom: -200px; right: -200px; }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 56px;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(124,107,255,0.12);
+      border: 1px solid rgba(124,107,255,0.3);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      background: linear-gradient(135deg, var(--text) 30%, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-family: var(--mono);
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 24px;
+      animation: fadeUp 0.6s ease both;
+    }
+    .card:nth-child(2) { animation-delay: 0.1s; }
+    .card:nth-child(3) { animation-delay: 0.2s; }
+
+    .card-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-label::before {
+      content: '';
+      display: block;
+      width: 20px; height: 1px;
+      background: var(--border);
+    }
+
+    /* API URL input */
+    .url-row {
+      display: flex;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .url-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .url-input:focus { border-color: var(--accent); }
+    .url-input::placeholder { color: var(--muted); }
+
+    /* Textarea */
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      resize: vertical;
+      min-height: 140px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+
+    .hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    /* Buttons */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, var(--accent), #9b8cff);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 32px;
+      font-family: var(--display);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      box-shadow: 0 0 30px rgba(124,107,255,0.3);
+      white-space: nowrap;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 40px rgba(124,107,255,0.5); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-family: var(--mono);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-secondary:hover { color: var(--text); border-color: var(--accent); }
+
+    .actions-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    /* Loading */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* Error */
+    .error-box {
+      background: rgba(255,79,107,0.08);
+      border: 1px solid rgba(255,79,107,0.3);
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: var(--error);
+      font-family: var(--mono);
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .error-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    /* Results */
+    #results { animation: fadeUp 0.5s ease both; }
+
+    /* Identity section */
+    .identity-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .identity-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .identity-key {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .identity-val {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--accent3);
+      word-break: break-all;
+    }
+
+    /* Summary */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .summary-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+    }
+    .summary-num {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .summary-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 6px;
+    }
+
+    /* Section title */
+    .section-title {
+      font-size: 11px;
+      font-family: var(--mono);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Hierarchy cards */
+    .hierarchy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .hierarchy-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .hierarchy-card:hover { border-color: var(--accent); }
+    .hierarchy-card.cycle { border-color: rgba(255,107,157,0.3); }
+    .hierarchy-card.cycle:hover { border-color: var(--accent2); }
+
+    .hcard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .root-badge {
+      background: rgba(124,107,255,0.15);
+      border: 1px solid rgba(124,107,255,0.3);
+      border-radius: 8px;
+      padding: 4px 12px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .cycle-badge {
+      background: rgba(255,107,157,0.1);
+      border: 1px solid rgba(255,107,157,0.3);
+      border-radius: 100px;
+      padding: 3px 10px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--accent2);
+      letter-spacing: 0.1em;
+    }
+    .depth-badge {
+      background: rgba(107,255,203,0.1);
+      border: 1px solid rgba(107,255,203,0.2);
+      border-radius: 100px;
+      padding: 3px 10px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--accent3);
+      letter-spacing: 0.05em;
+    }
+
+    /* Tree visualization */
+    .tree-viz { margin-top: 12px; }
+    .tree-node {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .tree-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .tree-connector {
+      font-family: var(--mono);
+      color: var(--border);
+      font-size: 13px;
+      white-space: pre;
+      flex-shrink: 0;
+    }
+    .tree-node-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      background: rgba(124,107,255,0.1);
+      border: 1px solid rgba(124,107,255,0.25);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .tree-node-label.is-root {
+      background: rgba(124,107,255,0.2);
+      border-color: rgba(124,107,255,0.5);
+      color: var(--accent);
+    }
+
+    .cycle-placeholder {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 12px;
+      background: rgba(255,107,157,0.05);
+      border-radius: 8px;
+    }
+
+    /* Tags */
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+    .tag {
+      background: rgba(255,79,107,0.08);
+      border: 1px solid rgba(255,79,107,0.25);
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--error);
+    }
+    .tag.dup {
+      background: rgba(251,191,36,0.08);
+      border-color: rgba(251,191,36,0.25);
+      color: #fbbf24;
+    }
+    .tags-empty {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* Raw JSON toggle */
+    .raw-toggle {
+      margin-top: 24px;
+    }
+    .raw-json {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
+      color: var(--text);
+      display: none;
+      margin-top: 12px;
+    }
+    .raw-json.open { display: block; }
+    .json-key { color: var(--accent); }
+    .json-str { color: var(--accent3); }
+    .json-num { color: var(--accent2); }
+    .json-bool { color: #fbbf24; }
+
+    /* Animations */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    @media (max-width: 600px) {
+      .summary-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .url-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-orb glow-orb-1"></div>
+  <div class="glow-orb glow-orb-2"></div>
+
+  <div class="container">
+    <header>
+      <div class="badge">SRM Full Stack Challenge</div>
+      <h1>Node Hierarchy<br/>Explorer</h1>
+      <p class="subtitle">POST /bfhl — Tree Construction & Cycle Detection</p>
+    </header>
+
+    <!-- API Config -->
+    <div class="card">
+      <div class="card-label">Backend API URL</div>
+      <div class="url-row">
+        <input class="url-input" id="apiUrl" type="text"
+               placeholder="https://your-app.onrender.com"
+               value="http://localhost:3000"/>
+        <button class="btn-secondary" onclick="testConnection()">↗ Test</button>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="card">
+      <div class="card-label">Node Input</div>
+      <textarea id="nodeInput" placeholder="A->B, A->C, B->D, hello, 1->2&#10;or one per line:&#10;A->B&#10;A->C&#10;B->D"></textarea>
+      <p class="hint">// comma or newline separated edges. e.g. A->B, X->Y, A->A</p>
+      <div class="actions-row">
+        <button class="btn-primary" id="submitBtn" onclick="submitData()">
+          <span id="btnText">Run Analysis</span>
+          <span id="btnSpinner" class="spinner" style="display:none"></span>
+        </button>
+        <button class="btn-secondary" onclick="loadExample()">Load Example</button>
+        <button class="btn-secondary" onclick="clearAll()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="error-box" id="errorBox" style="display:none">
+      <span class="error-icon">⚠</span>
+      <span id="errorMsg"></span>
+    </div>
+
+    <!-- Results -->
+    <div id="results" style="display:none">
+      <!-- Identity -->
+      <div class="card">
+        <div class="card-label">Identity</div>
+        <div class="identity-grid" id="identityGrid"></div>
+
+        <!-- Summary -->
+        <div class="section-title">Summary</div>
+        <div class="summary-grid" id="summaryGrid"></div>
+      </div>
+
+      <!-- Hierarchies -->
+      <div class="card">
+        <div class="card-label">Hierarchies</div>
+        <div class="hierarchy-grid" id="hierarchyGrid"></div>
+      </div>
+
+      <!-- Invalid + Duplicates -->
+      <div class="card">
+        <div class="card-label">Invalid Entries</div>
+        <div id="invalidTags" class="tags"></div>
+
+        <div class="card-label" style="margin-top:24px">Duplicate Edges</div>
+        <div id="dupTags" class="tags"></div>
+
+        <!-- Raw JSON -->
+        <div class="raw-toggle">
+          <button class="btn-secondary" onclick="toggleRaw()">{ } Raw JSON</button>
+          <pre class="raw-json" id="rawJson"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const EXAMPLE_INPUT = "A->B, A->C, B->D, C->E, E->F, X->Y, Y->Z, Z->X, P->Q, Q->R, G->H, G->H, G->I, hello, 1->2, A->";
+
+    function loadExample() {
+      document.getElementById('nodeInput').value = EXAMPLE_INPUT;
+    }
+
+    function clearAll() {
+      document.getElementById('nodeInput').value = '';
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('errorBox').style.display = 'none';
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      document.getElementById('errorMsg').textContent = msg;
+      box.style.display = 'flex';
+    }
+
+    function hideError() {
+      document.getElementById('errorBox').style.display = 'none';
+    }
+
+    function setLoading(v) {
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = v;
+      document.getElementById('btnText').textContent = v ? 'Running...' : 'Run Analysis';
+      document.getElementById('btnSpinner').style.display = v ? 'inline-block' : 'none';
+    }
+
+    async function testConnection() {
+      const url = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+      try {
+        const r = await fetch(`${url}/`, { method: 'GET' });
+        if (r.ok) {
+          alert('✅ Connected! API is reachable.');
+        } else {
+          alert(`⚠️ Server responded with status ${r.status}`);
+        }
+      } catch(e) {
+        alert('❌ Could not reach the server. Check the URL or CORS.');
+      }
+    }
+
+    async function submitData() {
+      hideError();
+      const raw = document.getElementById('nodeInput').value;
+      const url = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+
+      if (!raw.trim()) { showError('Please enter some node data.'); return; }
+      if (!url) { showError('Please enter the backend API URL.'); return; }
+
+      // Parse input: split by comma or newline
+      const data = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+
+      setLoading(true);
+      try {
+        const res = await fetch(`${url}/bfhl`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data })
+        });
+
+        if (!res.ok) {
+          const errBody = await res.text();
+          throw new Error(`API returned ${res.status}: ${errBody}`);
+        }
+
+        const json = await res.json();
+        renderResults(json);
+        document.getElementById('results').style.display = 'block';
+        document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {
+        showError(`API call failed: ${e.message}`);
+        document.getElementById('results').style.display = 'none';
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderResults(data) {
+      // Identity
+      const idGrid = document.getElementById('identityGrid');
+      idGrid.innerHTML = ['user_id','email_id','college_roll_number'].map(k => `
+        <div class="identity-item">
+          <div class="identity-key">${k}</div>
+          <div class="identity-val">${data[k] || '—'}</div>
+        </div>
+      `).join('');
+
+      // Summary
+      const s = data.summary || {};
+      document.getElementById('summaryGrid').innerHTML = `
+        <div class="summary-item">
+          <div class="summary-num">${s.total_trees ?? 0}</div>
+          <div class="summary-label">Valid Trees</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num" style="color:var(--accent2)">${s.total_cycles ?? 0}</div>
+          <div class="summary-label">Cycles</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num" style="color:var(--accent3)">${s.largest_tree_root || '—'}</div>
+          <div class="summary-label">Largest Root</div>
+        </div>
+      `;
+
+      // Hierarchies
+      const hGrid = document.getElementById('hierarchyGrid');
+      hGrid.innerHTML = (data.hierarchies || []).map(h => {
+        if (h.has_cycle) {
+          return `
+            <div class="hierarchy-card cycle">
+              <div class="hcard-header">
+                <div class="root-badge" style="border-color:rgba(255,107,157,0.4);color:var(--accent2)">${h.root}</div>
+                <span class="cycle-badge">⟳ CYCLE</span>
+              </div>
+              <div class="cycle-placeholder">
+                <span style="font-size:18px">∞</span>
+                <span>Cyclic group — no valid tree structure</span>
+              </div>
+            </div>`;
+        }
+        return `
+          <div class="hierarchy-card">
+            <div class="hcard-header">
+              <div class="root-badge">${h.root}</div>
+              <span class="depth-badge">depth ${h.depth}</span>
+            </div>
+            <div class="tree-viz">${renderTree(h.tree, h.root, true)}</div>
+          </div>`;
+      }).join('');
+
+      // Invalid
+      const inv = data.invalid_entries || [];
+      document.getElementById('invalidTags').innerHTML = inv.length
+        ? inv.map(e => `<span class="tag">${escHtml(e)}</span>`).join('')
+        : '<span class="tags-empty">None ✓</span>';
+
+      // Duplicates
+      const dup = data.duplicate_edges || [];
+      document.getElementById('dupTags').innerHTML = dup.length
+        ? dup.map(e => `<span class="tag dup">${escHtml(e)}</span>`).join('')
+        : '<span class="tags-empty">None ✓</span>';
+
+      // Raw JSON
+      document.getElementById('rawJson').innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+    }
+
+    function renderTree(treeObj, rootLabel, isRoot) {
+      if (!treeObj || Object.keys(treeObj).length === 0) return '';
+
+      function buildLines(node, prefix, isLastChild) {
+        const children = Object.keys(node);
+        let html = '';
+        children.forEach((child, i) => {
+          const last = i === children.length - 1;
+          const connector = last ? '└─ ' : '├─ ';
+          const nextPrefix = prefix + (last ? '   ' : '│  ');
+          html += `<div class="tree-row">
+            <span class="tree-connector">${prefix}${connector}</span>
+            <span class="tree-node-label">${child}</span>
+          </div>`;
+          html += buildLines(node[child], nextPrefix, last);
+        });
+        return html;
+      }
+
+      // Get the children of root
+      const rootChildren = treeObj[rootLabel] || {};
+      let html = `<div class="tree-row"><span class="tree-node-label is-root">${rootLabel}</span></div>`;
+      html += buildLines(rootChildren, '', false);
+      return `<div class="tree-node">${html}</div>`;
+    }
+
+    function toggleRaw() {
+      const el = document.getElementById('rawJson');
+      el.classList.toggle('open');
+    }
+
+    function escHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function syntaxHighlight(json) {
+      return json
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+        .replace(/: "([^"]*)"/g, ': <span class="json-str">"$1"</span>')
+        .replace(/: (\d+)/g, ': <span class="json-num">$1</span>')
+        .replace(/: (true|false)/g, ': <span class="json-bool">$1</span>');
+    }
+  </script>
+</body>
+</html>
